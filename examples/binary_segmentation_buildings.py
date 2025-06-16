@@ -54,6 +54,13 @@ from tqdm import tqdm
 
 import segmentation_models_pytorch as smp
 
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--main_dir', type=str, default='/mnt/dataset/segmentation_models/examples/binary_segmentation_data', help='work path')
+opt = parser.parse_args()
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(message)s",
@@ -69,11 +76,15 @@ if device == "cpu":
     os.system("export OMP_NUM_THREADS=64")
     torch.set_num_threads(os.cpu_count())
 
+seed=0
+np.random.seed(seed)
+torch.manual_seed(seed)
+
 # ----------------------------
 # Download the CamVid dataset, if needed
 # ----------------------------
 # Change this to your desired directory
-main_dir = "./examples/binary_segmentation_data/"
+main_dir = opt.main_dir
 
 data_dir = os.path.join(main_dir, "dataset")
 if not os.path.exists(data_dir):
@@ -211,8 +222,8 @@ class CamVidModel(torch.nn.Module):
 
     def __init__(self, arch, encoder_name, in_channels=3, out_classes=1, **kwargs):
         super().__init__()
-        self.mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
-        self.std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+        self.mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1).to(device)
+        self.std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1).to(device)
         self.model = smp.create_model(
             arch,
             encoder_name=encoder_name,
@@ -245,7 +256,7 @@ def visualize(output_dir, image_filename, **images):
 
 # Use multiple CPUs in parallel
 def train_and_evaluate_one_epoch(
-    model, train_dataloader, valid_dataloader, optimizer, scheduler, loss_fn, device
+    model, train_dataloader, valid_dataloader, optimizer, scheduler, loss_fn, device, scaler
 ):
     # Set the model to training mode
     model.train()
@@ -258,8 +269,13 @@ def train_and_evaluate_one_epoch(
         outputs = model(images)
 
         loss = loss_fn(outputs, masks)
-        loss.backward()
-        optimizer.step()
+        # loss.backward()
+        # optimizer.step()
+
+        #TODO SDAA conv subnormal issue, scaler is helpful
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         train_loss += loss.item()
 
@@ -295,6 +311,8 @@ def train_model(
 ):
     train_losses = []
     val_losses = []
+    from torch.amp import GradScaler
+    scaler = GradScaler()
 
     for epoch in range(epochs):
         avg_train_loss, avg_val_loss = train_and_evaluate_one_epoch(
@@ -305,6 +323,7 @@ def train_model(
             scheduler,
             loss_fn,
             device,
+            scaler
         )
         train_losses.append(avg_train_loss)
         val_losses.append(avg_val_loss)
