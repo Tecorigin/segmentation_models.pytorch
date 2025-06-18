@@ -67,6 +67,8 @@ Visit [Read The Docs Project Page](https://smp.readthedocs.io/) or read the foll
 
 ## ⏳ Quick start <a name="start"></a>
 
+To use on SDAA platform: export TORCH_SDAA_AUTOLOAD=cuda_migrate
+
 #### 1. Create your first Segmentation model with SMP
 
 The segmentation model is just a PyTorch `torch.nn.Module`, which can be created as easy as:
@@ -189,13 +191,7 @@ model = smp.Unet('resnet34', encoder_depth=4)
 PyPI version:
 
 ```bash
-$ pip install segmentation-models-pytorch
-````
-
-The latest version from GitHub:
-
-```bash
-$ pip install git+https://github.com/qubvel/segmentation_models.pytorch
+$ pip install segmentation_models_pytorch-0.5.0-py3-none-any.whl
 ````
 
 ## 🏆 Competitions won with the library <a name="competitions"></a>
